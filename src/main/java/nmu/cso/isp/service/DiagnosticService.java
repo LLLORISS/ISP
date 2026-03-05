@@ -12,6 +12,11 @@ public class DiagnosticService {
         this.customerRepository = customerRepository;
     }
 
+    public boolean authenticate(String contract, String phone) {
+        Customer customer = customerRepository.findByContractNumber(contract);
+        return customer != null && customer.getPhoneNumber().equals(phone);
+    }
+
     public String diagnoseCustomer(String contractNumber) {
         Customer customer = customerRepository.findByContractNumber(contractNumber);
 
@@ -34,5 +39,24 @@ public class DiagnosticService {
         } else {
             return "Статус: Офлайн. Сигнал на порту " + customer.getPortNumber() + " відсутній. Можливий обрив кабелю.";
         }
+    }
+
+    public String getContractInfo(String contractNumber) {
+        Customer customer = customerRepository.findByContractNumber(contractNumber);
+        if (customer == null) return "Помилка: Дані втрачено. Спробуйте /start";
+
+        return String.format(
+                "📋 *Інформація про договір*:\n\n" +
+                        "👤 Клієнт: %s\n" +
+                        "📑 Договір №: %s\n" +
+                        "📞 Телефон: %s\n" +
+                        "🏠 Адреса: %s\n" +
+                        "💰 Баланс: %.2f грн",
+                customer.getFullName(),
+                customer.getContractNumber(),
+                customer.getPhoneNumber(),
+                customer.getResidence(),
+                customer.getBalance()
+        );
     }
 }

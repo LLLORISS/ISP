@@ -13,6 +13,7 @@ public class Customer {
 
     private String fullName;
     private String contractNumber;
+    private String phoneNumber; // +38000000000
     private String switchIp;
     private Integer portNumber;
     private Double balance;
