@@ -73,6 +73,7 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                 ticket.setContactPhone(phoneForMaster);
                 ticket.setStatus("NEW");
                 ticket.setCreatedAt(java.time.LocalDateTime.now());
+                ticket.setUserChatId(chatId);
 
                 ticket = ticketRepository.save(ticket);
 

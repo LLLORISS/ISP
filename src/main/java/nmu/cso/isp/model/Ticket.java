@@ -17,6 +17,6 @@ public class Ticket {
     private String contactPhone;
     private String status; // "NEW", "IN_PROGRESS", "CLOSED"
     private LocalDateTime createdAt;
-
-
+    private String processedBy;
+    private Long userChatId;
 }
