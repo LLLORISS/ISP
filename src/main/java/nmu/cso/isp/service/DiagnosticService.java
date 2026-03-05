@@ -1,14 +1,19 @@
 package nmu.cso.isp.service;
 
 import nmu.cso.isp.model.Customer;
+import nmu.cso.isp.model.Ticket;
 import nmu.cso.isp.repository.CustomerRepository;
+import nmu.cso.isp.repository.TicketRepository;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 import java.util.Random;
 
 @Service
 public class DiagnosticService {
     private final CustomerRepository customerRepository;
     private final Random random = new Random();
+    private TicketRepository ticketRepository;
 
     public DiagnosticService(CustomerRepository customerRepository) {
         this.customerRepository = customerRepository;
@@ -84,5 +89,17 @@ public class DiagnosticService {
     private double generateSignalLevel() {
         // Нормальний сигнал для PON: -18 до -25. Поганий: нижче -27.
         return -18.0 - (random.nextDouble() * 12.0);
+    }
+
+    public String createTicket(String contract, String phone) {
+        Ticket ticket = new Ticket();
+        ticket.setContractNumber(contract);
+        ticket.setContactPhone(phone);
+        ticket.setStatus("NEW");
+        ticket.setCreatedAt(LocalDateTime.now());
+
+        ticketRepository.save(ticket);
+
+        return "TK-" + ticket.getId();
     }
 }

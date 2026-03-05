@@ -1,5 +1,6 @@
 package nmu.cso.isp.bot;
 
+import nmu.cso.isp.repository.TicketRepository;
 import nmu.cso.isp.service.DiagnosticService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -20,12 +21,16 @@ public class DiagnosticBot extends TelegramLongPollingBot {
     private final DiagnosticService diagnosticService;
     private final Map<Long, String> userState = new HashMap<>();
     private final Map<Long, String> tempContract = new HashMap<>();
+    private final TicketRepository ticketRepository;
+    private final AdminBot adminBot;
 
     @Value("${bot.name}")  private String botName;
     @Value("${bot.token}") private String botToken;
 
-    public DiagnosticBot(DiagnosticService diagnosticService) {
+    public DiagnosticBot(DiagnosticService diagnosticService, TicketRepository ticketRepository, AdminBot adminBot) {
         this.diagnosticService = diagnosticService;
+        this.ticketRepository = ticketRepository;
+        this.adminBot = adminBot;
     }
 
     @Override public String getBotUsername() { return this.botName; }
@@ -61,12 +66,20 @@ public class DiagnosticBot extends TelegramLongPollingBot {
             }
             else if ("WAITING_TICKET_PHONE".equals(currentState)) {
                 String contract = tempContract.get(chatId);
-                String ticketId = "TK-" + (100 + new java.util.Random().nextInt(900));
+                String phoneForMaster = text;
 
-                sendText(chatId, "✅ Заявка №" + ticketId + " успішно створена!");
-                sendText(chatId, "⏳ Очікуйте дзвінка на номер " + text + " протягом декількох хвилин. Наш спеціаліст вже поспішає на допомогу!");
+                nmu.cso.isp.model.Ticket ticket = new nmu.cso.isp.model.Ticket();
+                ticket.setContractNumber(contract);
+                ticket.setContactPhone(phoneForMaster);
+                ticket.setStatus("NEW");
+                ticket.setCreatedAt(java.time.LocalDateTime.now());
 
-                System.out.println("🔔 Заявка: Договір " + contract + ", Контакт: " + text);
+                ticket = ticketRepository.save(ticket);
+
+                adminBot.notifyNewTicket(ticket);
+
+                sendText(chatId, "✅ Заявка №" + ticket.getId() + " успішно створена!");
+                sendText(chatId, "⏳ Очікуйте дзвінка на номер " + phoneForMaster + " протягом декількох хвилин.");
 
                 userState.put(chatId, "AUTHENTICATED");
                 sendMenu(chatId, "Оберіть наступну дію:");
@@ -131,7 +144,7 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboard = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
-        row.add("🆘 Залишити заявку майстру");
+        row.add("🆘 Залишити заявку");
         keyboard.add(row);
 
         keyboardMarkup.setKeyboard(keyboard);

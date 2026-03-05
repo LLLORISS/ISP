@@ -8,12 +8,17 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 @Configuration
 public class BotConfig {
-    @Bean public TelegramBotsApi telegramBotsApi(DiagnosticBot diagnosticBot) throws TelegramApiException {
-        var api = new TelegramBotsApi(DefaultBotSession.class);
-        diagnosticBot.execute(new org.telegram.telegrambots.meta.api.methods.updates.DeleteWebhook(true));
-        api.registerBot(diagnosticBot);
-        System.out.println("Бот запущений!");
+    @Bean public TelegramBotsApi telegramBotsApi(DiagnosticBot diagnosticBot, AdminBot adminBot) throws TelegramApiException {
+        TelegramBotsApi api = new TelegramBotsApi(DefaultBotSession.class);
+
+        try {
+            api.registerBot(diagnosticBot);
+            api.registerBot(adminBot);
+            System.out.println("Боти успішно запущені!");
+        } catch (TelegramApiException e) {
+            System.err.println("Помилка при реєстрації ботів: " + e.getMessage());
+            throw e;
+        }
         return api;
     }
 }
-
