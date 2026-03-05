@@ -41,7 +41,7 @@ public class AdminBot extends TelegramLongPollingBot {
                         "📑 **Договір:** `%s`\n" +
                         "📞 **Контакт:** %s\n" +
                         "⏰ **Час:** %s\n" +
-                        "━━━━━━━━━━━━━━" +
+                        "━━━━━━━━━━━━━━",
                 ticket.getId(),
                 ticket.getContractNumber(),
                 ticket.getContactPhone(),
