@@ -3,156 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISP Speedtest</title>
+    <title>ISP Speedtest Real</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
-            background-color: #0d1117; 
+            background-color: #0d1117;
             color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden; 
+            overflow: hidden;
         }
-
-        .speedometer-container {
+        .speedometer {
             position: relative;
             width: 300px;
             height: 300px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
-
-        .gauge-background {
+        svg {
+            transform: rotate(135deg);
+        }
+        .base-circle {
+            fill: none;
+            stroke: #30363d;
+            stroke-width: 20;
+            stroke-dasharray: 471;
+            stroke-dashoffset: 118;
+            stroke-linecap: round;
+        }
+        .progress-circle {
+            fill: none;
+            stroke: url(#gradient);
+            stroke-width: 20;
+            stroke-dasharray: 471;
+            stroke-dashoffset: 471;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.1s linear;
+        }
+        .center-data {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 20px solid #30363d; 
-            box-sizing: border-box;
-            clip-path: polygon(0% 100%, 0% 0%, 100% 0%, 100% 100%, 50% 60%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
         }
-
-        .gauge-progress {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 20px solid transparent;
-            box-sizing: border-box;
-            border-image: linear-gradient(to right, #00ff88, #00e5ff) 1;
-            clip-path: polygon(0% 100%, 0% 0%, 50% 0%, 50% 50%, 0% 100%); 
-            transform: rotate(-90deg);
-            transition: clip-path 0.5s ease-out;
-        }
-
-        .gauge-center {
-            position: absolute;
-            width: 200px;
-            height: 200px;
-            background-color: #161b22;
-            border-radius: 50%;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-        }
-
         .speed-value {
-            font-size: 48px;
+            font-size: 64px;
             font-weight: bold;
             color: #00ff88;
-            text-shadow: 0 0 15px rgba(0,255,136,0.5);
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            line-height: 1;
         }
-
         .speed-unit {
-            font-size: 18px;
+            font-size: 20px;
             color: #ff4444;
             font-weight: bold;
+            margin-top: 5px;
         }
-
-        .info-text {
-            margin-top: 30px;
-            font-size: 16px;
-            color: #8b949e;
-        }
-
-        .action-button {
-            margin-top: 20px;
-            background: linear-gradient(to right, #00ff88, #00e5ff);
+        .btn {
+            margin-top: 25px;
+            background: linear-gradient(90deg, #00ff88, #00e5ff);
             border: none;
-            padding: 12px 24px;
-            color: #0d1117;
-            border-radius: 20px;
-            font-size: 18px;
+            padding: 15px 40px;
+            border-radius: 30px;
             font-weight: bold;
+            font-size: 16px;
             cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,255,136,0.3);
-            transition: transform 0.1s;
+            color: #0d1117;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
         }
-
-        .action-button:active {
-            transform: scale(0.95);
+        .btn:disabled {
+            background: #30363d;
+            color: #8b949e;
+            cursor: not-allowed;
         }
-
+        .info {
+            margin-top: 40px;
+            color: #8b949e;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
-<div class="speedometer-container">
-    <div class="gauge-background"></div>
-    <div class="gauge-progress" id="progressGauge"></div>
+<div class="speedometer">
+    <svg width="300" height="300" viewBox="0 0 200 200">
+        <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00ff88" />
+                <stop offset="100%" stop-color="#00e5ff" />
+            </linearGradient>
+        </defs>
+        <circle class="base-circle" cx="100" cy="100" r="75" />
+        <circle id="progress" class="progress-circle" cx="100" cy="100" r="75" />
+    </svg>
 
-    <div class="gauge-center">
-        <div class="speed-value" id="speedValue">0.00</div>
+    <div class="center-data">
+        <div id="speedText" class="speed-value">0.00</div>
         <div class="speed-unit">Mb/s</div>
     </div>
 </div>
 
-<div class="info-text">Вимірювання швидкості вашого підключення</div>
-<button class="action-button" id="startBtn" onclick="startTest()">ПОЧАТИ ТЕСТ</button>
+<div class="info">Вимірювання швидкості вашого підключення</div>
+<button id="startBtn" class="btn" onclick="startRealTest()">ПОЧАТИ ТЕСТ</button>
 
 <script>
     const webApp = window.Telegram.WebApp;
     webApp.expand();
-    const progressGauge = document.getElementById('progressGauge');
-    const speedValue = document.getElementById('speedValue');
+
+    const progressCircle = document.getElementById('progress');
+    const speedText = document.getElementById('speedText');
     const startBtn = document.getElementById('startBtn');
 
-    function updateGauge(value, maxValue = 100) {
-        let percentage = (value / maxValue) * 100;
-        if (percentage > 100) percentage = 100;
+    const maxDashOffset = 353;
 
-        let clipValue = 100 - percentage;
-        progressGauge.style.clipPath = `polygon(0% 100%, 0% 0%, ${percentage}% 0%, ${percentage}% ${clipValue}%, 0% 100%)`;
-
-        speedValue.innerText = value.toFixed(2);
+    function updateUI(mbps) {
+        let displayMbps = Math.min(mbps, 100);
+        const offset = 471 - (displayMbps / 100) * maxDashOffset;
+        progressCircle.style.strokeDashoffset = offset;
+        speedText.innerText = mbps.toFixed(2);
     }
 
-    function startTest() {
+    async function startRealTest() {
         startBtn.disabled = true;
-        startBtn.innerText = "ЗАМІР...";
-        let currentSpeed = 0;
+        startBtn.innerText = "ВИМІРЮВАННЯ...";
 
+        const testFileUrl = "/speedtest.html?nocache=" + Date.now();
 
-        let interval = setInterval(() => {
-            currentSpeed += Math.random() * 5;
-            if (currentSpeed >= 20.26) {
-                currentSpeed = 20.26;
-                clearInterval(interval);
-                startBtn.innerText = "ТЕСТ ЗАВЕРШЕНО";
+        try {
+            const startTime = performance.now();
+            const response = await fetch(testFileUrl);
+            const reader = response.body.getReader();
+
+            let loaded = 0;
+            while(true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                loaded += value.length;
+
+                const duration = (performance.now() - startTime) / 1000;
+                if (duration > 0) {
+                    const bps = (loaded * 8) / duration;
+                    const mbps = bps / (1024 * 1024);
+                    updateUI(mbps);
+                }
             }
-            updateGauge(currentSpeed);
-        }, 100);
+        } catch (e) {
+            speedText.innerText = "ERR";
+        } finally {
+            startBtn.innerText = "ТЕСТ ЗАВЕРШЕНО";
+        }
     }
-
 </script>
 </body>
 </html>
