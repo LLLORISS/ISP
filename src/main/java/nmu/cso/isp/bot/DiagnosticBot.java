@@ -10,7 +10,9 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageTe
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
+import org.telegram.telegrambots.meta.api.objects.webapp.WebAppInfo;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.ArrayList;
@@ -26,8 +28,12 @@ public class DiagnosticBot extends TelegramLongPollingBot {
     private final TicketRepository ticketRepository;
     private final AdminBot adminBot;
 
-    @Value("${bot.name}")  private String botName;
-    @Value("${bot.token}") private String botToken;
+    private final String webAppUrl = "https://isp-production-7051.up.railway.app/speedtest.html";
+
+    @Value("${bot.name}")
+    private String botName;
+    @Value("${bot.token}")
+    private String botToken;
 
     public DiagnosticBot(DiagnosticService diagnosticService, TicketRepository ticketRepository, AdminBot adminBot) {
         this.diagnosticService = diagnosticService;
@@ -35,8 +41,15 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         this.adminBot = adminBot;
     }
 
-    @Override public String getBotUsername() { return this.botName; }
-    @Override public String getBotToken() { return this.botToken; }
+    @Override
+    public String getBotUsername() {
+        return this.botName;
+    }
+
+    @Override
+    public String getBotToken() {
+        return this.botToken;
+    }
 
     @Override
     public void onUpdateReceived(Update update) {
@@ -48,64 +61,60 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
-            String currentState = userState.getOrDefault(chatId, "");
+            String currentState = userState.getOrDefault(chatId, "START_MENU");
+            String lowerText = text.toLowerCase();
 
             if (text.equals("/start")) {
-                sendText(chatId, "🤖 Вітаю! Я бот ISP для діагностики. \nЯ допоможу перевірити статус вашого інтернету та надати інформацію за договором.");
-                sendText(chatId, "Почнемо авторизацію. Введіть номер вашого договору:");
-                userState.put(chatId, "WAITING_CONTRACT");
+                userState.put(chatId, "START_MENU");
+                sendStartMenu(chatId, "🤖 <b>Вітаю у сервісному боті ISP!</b>\nЯ допоможу вам з діагностикою та інформацією за договором.");
+                return;
             }
-            else if ("WAITING_CONTRACT".equals(currentState)) {
-                tempContract.put(chatId, text);
-                sendText(chatId, "Тепер введіть номер телефону, закріплений за цим договором (у форматі +380...):");
-                userState.put(chatId, "WAITING_PHONE");
-            }
-            else if ("WAITING_PHONE".equals(currentState)) {
-                String contract = tempContract.get(chatId);
-                boolean isAuthenticated = diagnosticService.authenticate(contract, text);
 
-                if (isAuthenticated) {
+            if ("START_MENU".equals(currentState)) {
+                if (text.contains("Знайти договір") || text.contains("Авторизація")) {
+                    sendText(chatId, "🔍 Будь ласка, введіть <b>номер вашого договору</b>:");
+                    userState.put(chatId, "WAITING_CONTRACT");
+                } else if (!text.contains("Тест швидкості")) {
+                    sendStartMenu(chatId, "Будь ласка, оберіть один з варіантів нижче:");
+                }
+            } else if ("WAITING_CONTRACT".equals(currentState)) {
+                tempContract.put(chatId, text);
+                sendText(chatId, "📱 Тепер введіть <b>номер телефону</b>, закріплений за договором (+380...):");
+                userState.put(chatId, "WAITING_PHONE");
+            } else if ("WAITING_PHONE".equals(currentState)) {
+                String contract = tempContract.get(chatId);
+                if (diagnosticService.authenticate(contract, text)) {
                     userState.put(chatId, "AUTHENTICATED");
-                    sendMenu(chatId, "✅ Авторизація успішна! Оберіть дію:");
+                    sendMenu(chatId, "✅ <b>Авторизація успішна!</b>\nТепер ви можете переглянути дані або залишити заявку майстру.");
                 } else {
                     sendText(chatId, "❌ Дані не збігаються. Спробуйте ще раз /start");
                     userState.remove(chatId);
                 }
-            }
-            else if ("WAITING_TICKET_PHONE".equals(currentState)) {
-                String contract = tempContract.get(chatId);
-                String phoneForMaster = text;
-
+            } else if ("WAITING_TICKET_PHONE".equals(currentState)) {
                 nmu.cso.isp.model.Ticket ticket = new nmu.cso.isp.model.Ticket();
-                ticket.setContractNumber(contract);
-                ticket.setContactPhone(phoneForMaster);
+                ticket.setContractNumber(tempContract.get(chatId));
+                ticket.setContactPhone(text);
                 ticket.setStatus("NEW");
                 ticket.setCreatedAt(java.time.LocalDateTime.now());
                 ticket.setUserChatId(chatId);
-
                 ticket = ticketRepository.save(ticket);
                 adminBot.notifyNewTicket(ticket);
 
-                sendText(chatId, "✅ Заявка №" + ticket.getId() + " успішно створена!");
-                sendText(chatId, "⏳ Очікуйте дзвінка на номер " + phoneForMaster + " протягом декількох хвилин.");
-
+                sendText(chatId, "✅ <b>Заявка №" + ticket.getId() + " створена!</b>\nОчікуйте дзвінка протягом 15-30 хвилин.");
                 userState.put(chatId, "AUTHENTICATED");
-                sendMenu(chatId, "Оберіть наступну дію:");
-            }
-            else if ("AUTHENTICATED".equals(currentState)) {
+                sendMenu(chatId, "Бажаєте зробити щось ще?");
+            } else if ("AUTHENTICATED".equals(currentState)) {
                 String contract = tempContract.get(chatId);
-                String lowerText = text.toLowerCase();
-
                 if (lowerText.contains("інформація") || lowerText.contains("договір")) {
                     sendText(chatId, diagnosticService.getContractInfo(contract));
                 } else if (lowerText.contains("діагностика")) {
                     sendText(chatId, diagnosticService.diagnoseCustomer(contract));
-                    sendSupportButton(chatId, "🛠 Якщо проблема не вирішена, натисніть кнопку нижче:");
+                    sendSupportButton(chatId, "🛠 Якщо проблема не вирішена, ви можете викликати майстра:");
                 } else if (lowerText.contains("заявку") || lowerText.contains("майстру")) {
-                    sendText(chatId, "📞 Будь ласка, введіть контактний номер телефону, за яким служба підтримки зможе з вами зв'язатися:");
+                    sendText(chatId, "📞 Введіть <b>контактний номер</b>, за яким майстер зможе вам зателефонувати:");
                     userState.put(chatId, "WAITING_TICKET_PHONE");
                 } else {
-                    sendMenu(chatId, "Будь ласка, оберіть пункт меню:");
+                    sendMenu(chatId, "Оберіть пункт меню:");
                 }
             }
         }
@@ -115,6 +124,7 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(text);
+        message.setParseMode("HTML");
         try {
             execute(message);
         } catch (TelegramApiException e) {
@@ -126,12 +136,13 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(text);
+        message.setParseMode("HTML");
 
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboard = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
-        row.add("1. Інформація про договір");
-        row.add("2. Діагностика");
+        row.add("📄 Інформація");
+        row.add("🛠 Діагностика");
         keyboard.add(row);
         keyboardMarkup.setKeyboard(keyboard);
         keyboardMarkup.setResizeKeyboard(true);
@@ -192,6 +203,34 @@ public class DiagnosticBot extends TelegramLongPollingBot {
             } catch (TelegramApiException e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    private void sendStartMenu(long chatId, String text) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(text);
+        message.setParseMode("HTML");
+
+        ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+
+        KeyboardButton speedTestBtn = new KeyboardButton("🚀 Тест швидкості");
+        speedTestBtn.setWebApp(new WebAppInfo(webAppUrl));
+
+        row.add(speedTestBtn);
+        row.add(new KeyboardButton("🔍 Знайти договір"));
+
+        keyboard.add(row);
+        markup.setKeyboard(keyboard);
+        markup.setResizeKeyboard(true);
+        message.setReplyMarkup(markup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
         }
     }
 }
