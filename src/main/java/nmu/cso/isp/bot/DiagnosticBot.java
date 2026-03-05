@@ -1,5 +1,6 @@
 package nmu.cso.isp.bot;
 
+import nmu.cso.isp.model.Ticket;
 import nmu.cso.isp.repository.TicketRepository;
 import nmu.cso.isp.service.DiagnosticService;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Main customer-facing Telegram bot for ISP diagnostics and support.
+ * This bot handles user authentication, automated diagnostics, speed testing via Web Apps,
+ * and support ticket creation. It implements a simple state machine to manage
+ * conversational flows.
+ *
+ * @author Muts Nazar
+ * @version 1.1
+ */
 @Component
 public class DiagnosticBot extends TelegramLongPollingBot {
     private final DiagnosticService diagnosticService;
@@ -30,11 +40,16 @@ public class DiagnosticBot extends TelegramLongPollingBot {
 
     private final String webAppUrl = "https://isp-production-7051.up.railway.app/speedtest.html";
 
-    @Value("${bot.name}")
-    private String botName;
-    @Value("${bot.token}")
-    private String botToken;
+    @Value("${bot.name}") private String botName;
+    @Value("${bot.token}") private String botToken;
 
+    /**
+     * Initializes the DiagnosticBot with required services and repositories.
+     *
+     * @param diagnosticService service for contract validation and technical checks
+     * @param ticketRepository repository for managing customer support tickets
+     * @param adminBot reference to the administrative bot for ticket notifications
+     */
     public DiagnosticBot(DiagnosticService diagnosticService, TicketRepository ticketRepository, AdminBot adminBot) {
         this.diagnosticService = diagnosticService;
         this.ticketRepository = ticketRepository;
@@ -51,6 +66,13 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         return this.botToken;
     }
 
+    /**
+     * Processes all incoming updates from Telegram.
+     * Handles text messages, Web App data, and callback queries for the rating system.
+     * Implements logic for states such as START_MENU, WAITING_CONTRACT, and AUTHENTICATED.
+     *
+     * @param update the incoming Telegram update
+     */
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasCallbackQuery()) {
@@ -99,38 +121,59 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                         userState.remove(chatId);
                     }
                 } else if ("WAITING_TICKET_PHONE".equals(currentState)) {
-                    nmu.cso.isp.model.Ticket ticket = new nmu.cso.isp.model.Ticket();
-                    ticket.setContractNumber(tempContract.get(chatId));
-                    ticket.setContactPhone(text);
-                    ticket.setStatus("NEW");
-                    ticket.setCreatedAt(java.time.LocalDateTime.now());
-                    ticket.setUserChatId(chatId);
-                    ticket = ticketRepository.save(ticket);
-                    adminBot.notifyNewTicket(ticket);
-
-                    sendText(chatId, "✅ <b>Заявка №" + ticket.getId() + " створена!</b>\nОчікуйте дзвінка протягом 15-30 хвилин.");
-                    userState.put(chatId, "AUTHENTICATED");
-                    sendMenu(chatId, "Бажаєте зробити щось ще?");
+                    saveAndNotifyTicket(chatId, text);
                 } else if ("AUTHENTICATED".equals(currentState)) {
-                    String contract = tempContract.get(chatId);
-                    if (lowerText.contains("інформація") || lowerText.contains("договір")) {
-                        sendText(chatId, diagnosticService.getContractInfo(contract));
-                    } else if (lowerText.contains("діагностика")) {
-                        sendText(chatId, diagnosticService.diagnoseCustomer(contract));
-                        sendSupportButton(chatId, "🛠 Якщо проблема не вирішена, ви можете викликати майстра:");
-                    } else if (lowerText.contains("заявку") || lowerText.contains("майстру")) {
-                        sendText(chatId, "📞 Введіть <b>контактний номер</b>, за яким майстер зможе вам зателефонувати:");
-                        userState.put(chatId, "WAITING_TICKET_PHONE");
-                    } else if (lowerText.contains("головне меню")) {
-                        sendStartMenu(chatId, "Ви повернулися до головного меню.");
-                    } else {
-                        sendMenu(chatId, "Оберіть пункт меню:");
-                    }
+                    handleAuthenticatedFlow(chatId, lowerText);
                 }
             }
         }
     }
 
+    /**
+     * Handles user interaction after successful authentication.
+     *
+     * @param chatId the user's unique chat ID
+     * @param lowerText the lowercase message text for command matching
+     */
+    private void handleAuthenticatedFlow(long chatId, String lowerText) {
+        String contract = tempContract.get(chatId);
+        if (lowerText.contains("інформація") || lowerText.contains("договір")) {
+            sendText(chatId, diagnosticService.getContractInfo(contract));
+        } else if (lowerText.contains("діагностика")) {
+            sendText(chatId, diagnosticService.diagnoseCustomer(contract));
+            sendSupportButton(chatId, "🛠 Якщо проблема не вирішена, ви можете викликати майстра:");
+        } else if (lowerText.contains("заявку") || lowerText.contains("майстру")) {
+            sendText(chatId, "📞 Введіть <b>контактний номер</b>, за яким майстер зможе вам зателефонувати:");
+            userState.put(chatId, "WAITING_TICKET_PHONE");
+        } else if (lowerText.contains("головне меню")) {
+            sendStartMenu(chatId, "Ви повернулися до головного меню.");
+        } else {
+            sendMenu(chatId, "Оберіть пункт меню:");
+        }
+    }
+
+    /**
+     * Saves a new support ticket to the database and notifies the Admin Bot.
+     *
+     * @param chatId the user's chat ID
+     * @param phone the contact phone number provided for the ticket
+     */
+    private void saveAndNotifyTicket(long chatId, String phone) {
+        Ticket ticket = diagnosticService.createTicket(tempContract.get(chatId), phone, chatId);
+
+        adminBot.notifyNewTicket(ticket);
+
+        sendText(chatId, "✅ <b>Заявка №" + ticket.getId() + " створена!</b>\nОчікуйте дзвінка протягом 15-30 хвилин.");
+        userState.put(chatId, "AUTHENTICATED");
+        sendMenu(chatId, "Бажаєте зробити щось ще?");
+    }
+
+    /**
+     * Sends a plain text message to the specified chat with HTML formatting support.
+     *
+     * @param chatId the recipient's chat ID
+     * @param text the message content
+     */
     private void sendText(long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -143,6 +186,12 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         }
     }
 
+    /**
+     * Sends the main menu with persistent reply keyboard buttons for authenticated users.
+     *
+     * @param chatId the recipient's chat ID
+     * @param text the message content
+     */
     private void sendMenu(long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -166,6 +215,12 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         }
     }
 
+    /**
+     * Sends a support-focused keyboard allowing users to either create a ticket or return to menu.
+     *
+     * @param chatId the recipient's chat ID
+     * @param text the message content
+     */
     private void sendSupportButton(long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -191,6 +246,11 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         }
     }
 
+    /**
+     * Processes callback queries from inline buttons, such as service rating stars.
+     *
+     * @param callbackQuery the callback query to process
+     */
     private void processCallbackQuery(CallbackQuery callbackQuery) {
         String data = callbackQuery.getData();
         long chatId = callbackQuery.getMessage().getChatId();
@@ -219,6 +279,12 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         }
     }
 
+    /**
+     * Sends the initial start menu featuring the Web App speed test button.
+     *
+     * @param chatId the recipient's chat ID
+     * @param text the message content
+     */
     private void sendStartMenu(long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));

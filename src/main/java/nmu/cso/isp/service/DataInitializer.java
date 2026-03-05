@@ -5,14 +5,36 @@ import nmu.cso.isp.repository.CustomerRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+/**
+ * Data seeding component that populates the database with initial testing records.
+ * This class implements {@link CommandLineRunner}, ensuring it executes immediately
+ * after the Spring ApplicationContext is fully initialized.
+ * * It is primarily used during the development phase to provide a consistent
+ * set of mock customers for authentication and diagnostic testing.
+ *
+ * @author Muts Nazar
+ * @version 1.0
+ */
 @Component
 public class DataInitializer implements CommandLineRunner {
     private final CustomerRepository customerRepository;
 
+    /**
+     * Constructs the initializer with required repository access.
+     *
+     * @param customerRepository the repository used to persist initial customer data
+     */
     public DataInitializer(CustomerRepository customerRepository) {
         this.customerRepository = customerRepository;
     }
 
+    /**
+     * Executes the data seeding logic.
+     * It clears the existing customer table and inserts predefined mock records,
+     * including technical parameters like Switch IP, Port numbers, and financial balances.
+     *
+     * @param args command line arguments passed to the application (not used)
+     */
     @Override public void run(String... args) {
         customerRepository.deleteAll();
 

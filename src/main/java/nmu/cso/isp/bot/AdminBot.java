@@ -16,11 +16,24 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Administrative Telegram Bot component designed to manage service tickets.
+ * This bot acts as the internal CRM interface for technicians to receive,
+ * process, and close customer support requests.
+ * * @author Muts Nazar
+ * @version 1.0
+ */
 @Component
 public class AdminBot extends TelegramLongPollingBot {
     private final TicketRepository ticketRepository;
     private final DiagnosticBot diagnosticBot;
 
+    /**
+     * Constructs a new AdminBot instance.
+     *
+     * @param ticketRepository repository for ticket data persistence
+     * @param diagnosticBot reference to the client-facing bot for cross-bot communication
+     */
     public AdminBot(TicketRepository ticketRepository, @org.springframework.context.annotation.Lazy DiagnosticBot diagnosticBot) {
         this.ticketRepository = ticketRepository;
         this.diagnosticBot = diagnosticBot;
@@ -33,6 +46,13 @@ public class AdminBot extends TelegramLongPollingBot {
     @Override public String getBotUsername() { return this.botName; }
     @Override public String getBotToken() { return this.botToken; }
 
+    /**
+     * Handles incoming updates from the Telegram API.
+     * Primarily processes CallbackQueries triggered by inline buttons in the admin panel.
+     * Updates ticket status (take, close, reopen) based on administrative actions.
+     *
+     * @param update the incoming update from Telegram
+     */
     @Override public void onUpdateReceived(Update update) {
         if (update.hasCallbackQuery()) {
             String callbackData = update.getCallbackQuery().getData();
@@ -69,6 +89,12 @@ public class AdminBot extends TelegramLongPollingBot {
         }
     }
 
+    /**
+     * Sends a notification to the administrator group about a new service ticket.
+     * Includes ticket details and control buttons for status management.
+     *
+     * @param ticket the Ticket object containing request details
+     */
     public void notifyNewTicket(Ticket ticket) {
         SendMessage message = new SendMessage();
         message.setChatId(adminChatId);
@@ -78,6 +104,13 @@ public class AdminBot extends TelegramLongPollingBot {
         try { execute(message); } catch (TelegramApiException e) { e.printStackTrace(); }
     }
 
+    /**
+     * Updates an existing ticket message in the Telegram chat to reflect status changes.
+     *
+     * @param chatId the unique identifier for the chat
+     * @param messageId the identifier of the message to be edited
+     * @param ticket the updated Ticket object
+     */
     private void updateTicketMessage(long chatId, long messageId, Ticket ticket) {
         EditMessageText edit = new EditMessageText();
         edit.setChatId(String.valueOf(chatId));
@@ -88,6 +121,13 @@ public class AdminBot extends TelegramLongPollingBot {
         try { execute(edit); } catch (TelegramApiException e) { e.printStackTrace(); }
     }
 
+    /**
+     * Formats ticket information into a stylized HTML string for Telegram display.
+     * Uses emojis and standard formatting for improved readability.
+     *
+     * @param ticket the Ticket to format
+     * @return a formatted HTML string
+     */
     private String formatTicketText(Ticket ticket) {
         String statusEmoji = ticket.getStatus().equals("NEW") ? "🆕" : (ticket.getStatus().equals("CLOSED") ? "✅" : "🛠");
 
@@ -108,6 +148,13 @@ public class AdminBot extends TelegramLongPollingBot {
         );
     }
 
+    /**
+     * Generates a dynamic inline keyboard based on the ticket's current status.
+     * Provides relevant actions like "Take in work", "Close", or "Reopen".
+     *
+     * @param ticket the Ticket used to determine appropriate actions
+     * @return an InlineKeyboardMarkup containing action buttons
+     */
     private InlineKeyboardMarkup createButtons(Ticket ticket) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -126,6 +173,13 @@ public class AdminBot extends TelegramLongPollingBot {
         return markup;
     }
 
+    /**
+     * Helper method to create an InlineKeyboardButton.
+     *
+     * @param text label for the button
+     * @param callbackData data to be sent back when the button is pressed
+     * @return a new InlineKeyboardButton instance
+     */
     private InlineKeyboardButton createBtn(String text, String callbackData) {
         InlineKeyboardButton btn = new InlineKeyboardButton();
         btn.setText(text);
@@ -133,6 +187,12 @@ public class AdminBot extends TelegramLongPollingBot {
         return btn;
     }
 
+    /**
+     * Sends a notification to the user via DiagnosticBot that their ticket has been closed.
+     * Includes a rating system (1-5 stars) for service quality feedback.
+     *
+     * @param ticket the Ticket that was just closed
+     */
     private void notifyClientTicketClosed(Ticket ticket) {
         if (ticket.getUserChatId() != null) {
             SendMessage message = new SendMessage();
@@ -164,6 +224,12 @@ public class AdminBot extends TelegramLongPollingBot {
         }
     }
 
+    /**
+     * Sends an urgent broadcast message to the administrator group Chat ID.
+     *
+     * @param text the message content in Markdown format
+     * @param ticket associated Ticket context for providing action buttons
+     */
     public void sendUrgentMessage(String text, Ticket ticket) {
         SendMessage message = new SendMessage();
         message.setChatId(adminChatId);
