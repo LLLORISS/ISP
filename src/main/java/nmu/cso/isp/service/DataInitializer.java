@@ -14,9 +14,12 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     @Override public void run(String... args) {
+        customerRepository.deleteAll();
+
         Customer c1 = new Customer();
         c1.setFullName("Муц Назар");
         c1.setContractNumber("101");
+        c1.setPhoneNumber("+380983958180");
         c1.setResidence("Золочів");
         c1.setSwitchIp("192.168.10.5");
         c1.setPortNumber(12);
@@ -26,6 +29,7 @@ public class DataInitializer implements CommandLineRunner {
         Customer c2 = new Customer();
         c2.setFullName("Тестовий Користувач");
         c2.setContractNumber("228");
+        c2.setPhoneNumber("+380507654321");
         c2.setResidence("Тернопіль");
         c2.setSwitchIp("192.168.10.8");
         c2.setPortNumber(3);
