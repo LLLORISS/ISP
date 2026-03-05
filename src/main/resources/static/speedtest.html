@@ -155,6 +155,10 @@
             speedText.innerText = "ERR";
         } finally {
             startBtn.innerText = "ТЕСТ ЗАВЕРШЕНО";
+            setTimeout(() => {
+                const result = speedText.innerText;
+                window.Telegram.WebApp.sendData("Результат тесту: " + result + " Mb/s");
+            }, 2500);
         }
     }
 </script>
