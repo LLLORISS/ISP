@@ -35,16 +35,19 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         if(update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
+            String currentState = userState.getOrDefault(chatId, "");
 
             if(text.equals("/start")) {
                 sendText(chatId, "🤖 Вітаю! Я бот ISP для діагностики. \nЯ допоможу перевірити статус вашого інтернету та надати інформацію за договором.");
                 sendText(chatId, "Почнемо авторизацію. Введіть номер вашого договору:");
                 userState.put(chatId, "WAITING_CONTRACT");
-            } else if ("WAITING_CONTRACT".equals(userState.get(chatId))) {
+            }
+            else if ("WAITING_CONTRACT".equals(currentState)) {
                 tempContract.put(chatId, text);
                 sendText(chatId, "Тепер введіть номер телефону, закріплений за цим договором (у форматі +380...):");
                 userState.put(chatId, "WAITING_PHONE");
-            } else if("WAITING_PHONE".equals(userState.get(chatId))) {
+            }
+            else if("WAITING_PHONE".equals(currentState)) {
                 String contract = tempContract.get(chatId);
                 boolean isAuthenticated = diagnosticService.authenticate(contract, text);
 
@@ -55,7 +58,20 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                     sendText(chatId, "❌ Дані не збігаються. Спробуйте ще раз /start");
                     userState.remove(chatId);
                 }
-            } else if("AUTHENTICATED".equals(userState.get(chatId))) {
+            }
+            else if ("WAITING_TICKET_PHONE".equals(currentState)) {
+                String contract = tempContract.get(chatId);
+                String ticketId = "TK-" + (100 + new java.util.Random().nextInt(900));
+
+                sendText(chatId, "✅ Заявка №" + ticketId + " успішно створена!");
+                sendText(chatId, "⏳ Очікуйте дзвінка на номер " + text + " протягом декількох хвилин. Наш спеціаліст вже поспішає на допомогу!");
+
+                System.out.println("🔔 Заявка: Договір " + contract + ", Контакт: " + text);
+
+                userState.put(chatId, "AUTHENTICATED");
+                sendMenu(chatId, "Оберіть наступну дію:");
+            }
+            else if("AUTHENTICATED".equals(currentState)) {
                 String contract = tempContract.get(chatId);
                 String lowerText = text.toLowerCase();
 
@@ -63,12 +79,15 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                     sendText(chatId, diagnosticService.getContractInfo(contract));
                 } else if (lowerText.contains("діагностика")) {
                     sendText(chatId, diagnosticService.diagnoseCustomer(contract));
+                    sendSupportButton(chatId, "🛠 Якщо проблема не вирішена, натисніть кнопку нижче:");
+                } else if (lowerText.contains("заявку") || lowerText.contains("майстру")) {
+                    sendText(chatId, "📞 Будь ласка, введіть контактний номер телефону, за яким служба підтримки зможе з вами зв'язатися:");
+                    userState.put(chatId, "WAITING_TICKET_PHONE");
                 } else {
                     sendMenu(chatId, "Будь ласка, оберіть пункт меню:");
                 }
             }
         }
-
     }
 
     private void sendText(long chatId, String text) {
@@ -95,6 +114,29 @@ public class DiagnosticBot extends TelegramLongPollingBot {
         keyboard.add(row);
         keyboardMarkup.setKeyboard(keyboard);
         keyboardMarkup.setResizeKeyboard(true);
+        message.setReplyMarkup(keyboardMarkup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendSupportButton(long chatId, String text) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(text);
+
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+        row.add("🆘 Залишити заявку майстру");
+        keyboard.add(row);
+
+        keyboardMarkup.setKeyboard(keyboard);
+        keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setOneTimeKeyboard(true);
         message.setReplyMarkup(keyboardMarkup);
 
         try {

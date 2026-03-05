@@ -3,10 +3,12 @@ package nmu.cso.isp.service;
 import nmu.cso.isp.model.Customer;
 import nmu.cso.isp.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
+import java.util.Random;
 
 @Service
 public class DiagnosticService {
     private final CustomerRepository customerRepository;
+    private final Random random = new Random();
 
     public DiagnosticService(CustomerRepository customerRepository) {
         this.customerRepository = customerRepository;
@@ -19,26 +21,37 @@ public class DiagnosticService {
 
     public String diagnoseCustomer(String contractNumber) {
         Customer customer = customerRepository.findByContractNumber(contractNumber);
+        if (customer == null) return "❌ Помилка: Клієнта не знайдено.";
 
-        if(customer == null) {
-            return "Помилка: Клієнта з номером " + contractNumber + " не знайдено";
+        StringBuilder report = new StringBuilder();
+        report.append("🔍 **Запущено глибоку діагностику лінії...**\n\n");
+
+        if (!checkBalance(customer)) {
+            report.append("🛑 **Зупинено:** Доступ обмежено через заборгованість (")
+                    .append(customer.getBalance()).append(" грн).\n")
+                    .append("💳 Будь ласка, поповніть рахунок для відновлення послуги.");
+            return report.toString();
+        }
+        report.append("✅ Білінг: Доступ дозволено.\n");
+
+        if (!checkPhysicalLink()) {
+            report.append("❌ **Порт:** Статус Down. Сигнал на порту ")
+                    .append(customer.getPortNumber()).append(" відсутній.\n")
+                    .append("⚠️ Можливий обрив кабелю або вимкнення живлення роутера.");
+            return report.toString();
+        }
+        report.append("✅ Лінк: Активний (1000 Mbps).\n");
+
+        double signal = generateSignalLevel();
+        report.append("📡 Рівень сигналу: ").append(String.format("%.2f", signal)).append(" дБм\n");
+        if (signal < -27.0) {
+            report.append("⚠️ Попередження: Критично низький рівень сигналу!\n");
         }
 
-        if (customer.getBalance() < 0) {
-            return "Статус: Заблоковано. Баланс: " + customer.getBalance() + " грн. Будь ласка, поповніть рахунок.";
-        }
+        report.append("🌐 IP-адреса: ").append(customer.getSwitchIp()).append("\n\n");
+        report.append("🚀 **Висновок:** Проблем на стороні провайдера не виявлено. Мережа працює стабільно. \nЯкщо у вас все ще залишились питання по роботі інтернету ви можете зв'язатися з нашою технічною підтримкою по номеру +380123456789 або залишити заявку на дзвінок від нас");
 
-        return simulateNetworkCheck(customer);
-    }
-
-    private String simulateNetworkCheck(Customer customer) {
-        boolean isUp = Math.random() > 0.2;
-
-        if (isUp) {
-            return "Статус: Онлайн. Обладнання за адресою " + customer.getSwitchIp() + " працює стабільно. Порт " + customer.getPortNumber() + " активний.";
-        } else {
-            return "Статус: Офлайн. Сигнал на порту " + customer.getPortNumber() + " відсутній. Можливий обрив кабелю.";
-        }
+        return report.toString();
     }
 
     public String getContractInfo(String contractNumber) {
@@ -58,5 +71,18 @@ public class DiagnosticService {
                 customer.getResidence(),
                 customer.getBalance()
         );
+    }
+
+    private boolean checkBalance(Customer customer) {
+        return customer.getBalance() > 0;
+    }
+
+    private boolean checkPhysicalLink() {
+        return random.nextDouble() > 0.15;
+    }
+
+    private double generateSignalLevel() {
+        // Нормальний сигнал для PON: -18 до -25. Поганий: нижче -27.
+        return -18.0 - (random.nextDouble() * 12.0);
     }
 }
