@@ -19,4 +19,5 @@ public class Ticket {
     private LocalDateTime createdAt;
     private String processedBy;
     private Long userChatId;
+    private Integer rating;
 }

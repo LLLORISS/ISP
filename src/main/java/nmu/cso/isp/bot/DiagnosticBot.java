@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
@@ -36,13 +38,19 @@ public class DiagnosticBot extends TelegramLongPollingBot {
     @Override public String getBotUsername() { return this.botName; }
     @Override public String getBotToken() { return this.botToken; }
 
-    @Override public void onUpdateReceived(Update update) {
-        if(update.hasMessage() && update.getMessage().hasText()) {
+    @Override
+    public void onUpdateReceived(Update update) {
+        if (update.hasCallbackQuery()) {
+            processCallbackQuery(update.getCallbackQuery());
+            return;
+        }
+
+        if (update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
             String currentState = userState.getOrDefault(chatId, "");
 
-            if(text.equals("/start")) {
+            if (text.equals("/start")) {
                 sendText(chatId, "🤖 Вітаю! Я бот ISP для діагностики. \nЯ допоможу перевірити статус вашого інтернету та надати інформацію за договором.");
                 sendText(chatId, "Почнемо авторизацію. Введіть номер вашого договору:");
                 userState.put(chatId, "WAITING_CONTRACT");
@@ -52,11 +60,11 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                 sendText(chatId, "Тепер введіть номер телефону, закріплений за цим договором (у форматі +380...):");
                 userState.put(chatId, "WAITING_PHONE");
             }
-            else if("WAITING_PHONE".equals(currentState)) {
+            else if ("WAITING_PHONE".equals(currentState)) {
                 String contract = tempContract.get(chatId);
                 boolean isAuthenticated = diagnosticService.authenticate(contract, text);
 
-                if(isAuthenticated) {
+                if (isAuthenticated) {
                     userState.put(chatId, "AUTHENTICATED");
                     sendMenu(chatId, "✅ Авторизація успішна! Оберіть дію:");
                 } else {
@@ -76,7 +84,6 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                 ticket.setUserChatId(chatId);
 
                 ticket = ticketRepository.save(ticket);
-
                 adminBot.notifyNewTicket(ticket);
 
                 sendText(chatId, "✅ Заявка №" + ticket.getId() + " успішно створена!");
@@ -85,7 +92,7 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                 userState.put(chatId, "AUTHENTICATED");
                 sendMenu(chatId, "Оберіть наступну дію:");
             }
-            else if("AUTHENTICATED".equals(currentState)) {
+            else if ("AUTHENTICATED".equals(currentState)) {
                 String contract = tempContract.get(chatId);
                 String lowerText = text.toLowerCase();
 
@@ -157,6 +164,34 @@ public class DiagnosticBot extends TelegramLongPollingBot {
             execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void processCallbackQuery(CallbackQuery callbackQuery) {
+        String data = callbackQuery.getData();
+        long chatId = callbackQuery.getMessage().getChatId();
+        int messageId = callbackQuery.getMessage().getMessageId();
+
+        if (data.startsWith("rate_")) {
+            String[] parts = data.split("_");
+            Long ticketId = Long.parseLong(parts[1]);
+            Integer score = Integer.parseInt(parts[2]);
+
+            ticketRepository.findById(ticketId).ifPresent(ticket -> {
+                ticket.setRating(score);
+                ticketRepository.save(ticket);
+            });
+
+            EditMessageText edit = new EditMessageText();
+            edit.setChatId(String.valueOf(chatId));
+            edit.setMessageId(messageId);
+            edit.setText("⭐⭐⭐⭐⭐\nДякуємо за оцінку! Ви поставили: " + score + " ⭐\nВаша думка важлива для нас.");
+
+            try {
+                execute(edit);
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
         }
     }
 }

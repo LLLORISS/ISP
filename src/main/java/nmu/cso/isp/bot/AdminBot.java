@@ -135,14 +135,29 @@ public class AdminBot extends TelegramLongPollingBot {
         if (ticket.getUserChatId() != null) {
             SendMessage message = new SendMessage();
             message.setChatId(String.valueOf(ticket.getUserChatId()));
-            message.setText("✅ **Вашу заявку №" + ticket.getId() + " виконано!**\n" +
-                    "Дякуємо, що користуєтесь нашими послугами. Сподіваємось, тепер все працює чудово! 🚀");
+            message.setText("✅ **Вашу заявку №" + ticket.getId() + " виконано!**\n\n" +
+                    "Будь ласка, оцініть роботу нашого майстра:");
             message.setParseMode("Markdown");
+
+            InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+            List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+            List<InlineKeyboardButton> row = new ArrayList<>();
+
+            for (int i = 1; i <= 5; i++) {
+                InlineKeyboardButton btn = new InlineKeyboardButton();
+                btn.setText(i + " ⭐");
+                btn.setCallbackData("rate_" + ticket.getId() + "_" + i);
+                row.add(btn);
+            }
+
+            rows.add(row);
+            markup.setKeyboard(rows);
+            message.setReplyMarkup(markup);
 
             try {
                 diagnosticBot.execute(message);
             } catch (TelegramApiException e) {
-                System.err.println("Не вдалося надіслати сповіщення клієнту: " + e.getMessage());
+                e.printStackTrace();
             }
         }
     }
