@@ -57,9 +57,11 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                 }
             } else if("AUTHENTICATED".equals(userState.get(chatId))) {
                 String contract = tempContract.get(chatId);
-                if (text.contains("інформація про договір")) {
+                String lowerText = text.toLowerCase();
+
+                if (lowerText.contains("інформація") || lowerText.contains("договір")) {
                     sendText(chatId, diagnosticService.getContractInfo(contract));
-                } else if (text.contains("діагностика")) {
+                } else if (lowerText.contains("діагностика")) {
                     sendText(chatId, diagnosticService.diagnoseCustomer(contract));
                 } else {
                     sendMenu(chatId, "Будь ласка, оберіть пункт меню:");
