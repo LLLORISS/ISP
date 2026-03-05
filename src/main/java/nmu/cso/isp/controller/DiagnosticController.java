@@ -15,6 +15,6 @@ public class DiagnosticController {
 
     @GetMapping("/{contractNumber}")
     public String getDiagnostic(@PathVariable String contractNumber) {
-        return diagnosticService.checkStatus(contractNumber);
+        return diagnosticService.diagnoseCustomer(contractNumber);
     }
 }

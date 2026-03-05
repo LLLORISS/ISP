@@ -12,7 +12,7 @@ public class DiagnosticService {
         this.customerRepository = customerRepository;
     }
 
-    public String checkStatus(String contractNumber) {
+    public String diagnoseCustomer(String contractNumber) {
         Customer customer = customerRepository.findByContractNumber(contractNumber);
 
         if(customer == null) {
