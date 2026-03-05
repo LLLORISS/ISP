@@ -73,7 +73,7 @@ public class AdminBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(adminChatId);
         message.setText(formatTicketText(ticket));
-        message.setParseMode("Markdown");
+        message.setParseMode("HTML");
         message.setReplyMarkup(createButtons(ticket));
         try { execute(message); } catch (TelegramApiException e) { e.printStackTrace(); }
     }
@@ -83,21 +83,23 @@ public class AdminBot extends TelegramLongPollingBot {
         edit.setChatId(String.valueOf(chatId));
         edit.setMessageId((int) messageId);
         edit.setText(formatTicketText(ticket));
-        edit.setParseMode("Markdown");
+        edit.setParseMode("HTML");
         edit.setReplyMarkup(createButtons(ticket));
         try { execute(edit); } catch (TelegramApiException e) { e.printStackTrace(); }
     }
 
     private String formatTicketText(Ticket ticket) {
         String statusEmoji = ticket.getStatus().equals("NEW") ? "🆕" : (ticket.getStatus().equals("CLOSED") ? "✅" : "🛠");
-        String worker = ticket.getProcessedBy() != null ? "\n👷 **Майстер:** " + ticket.getProcessedBy() : "";
+
+        String worker = ticket.getProcessedBy() != null ?
+                "\n<b>Майстер:</b> " + ticket.getProcessedBy() : "";
 
         return String.format(
-                "%s **ЗАЯВКА №%d** [%s]\n" +
+                "%s <b>ЗАЯВКА №%d</b> [%s]\n" +
                         "━━━━━━━━━━━━━━\n" +
-                        "📑 **Договір:** `%s`\n" +
-                        "📞 **Контакт:** %s\n" +
-                        "⏰ **Створено:** %s%s\n" +
+                        "📑 <b>Договір:</b> <code>%s</code>\n" +
+                        "📞 <b>Контакт:</b> %s\n" +
+                        "⏰ <b>Створено:</b> %s%s\n" +
                         "━━━━━━━━━━━━━━",
                 statusEmoji, ticket.getId(), ticket.getStatus(),
                 ticket.getContractNumber(), ticket.getContactPhone(),
