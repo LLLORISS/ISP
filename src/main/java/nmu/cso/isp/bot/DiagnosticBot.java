@@ -37,7 +37,7 @@ public class DiagnosticBot extends TelegramLongPollingBot {
             long chatId = update.getMessage().getChatId();
 
             if(text.equals("/start")) {
-                sendText(chatId, "\uD83E\uDD16 Вітаю! Я бот ISP для діагностики. \\nЯ допоможу перевірити статус вашого інтернету та надати інформацію за договором.\");")
+                sendText(chatId, "\uD83E\uDD16 Вітаю! Я бот ISP для діагностики. \\nЯ допоможу перевірити статус вашого інтернету та надати інформацію за договором.\");");
                 sendText(chatId, "Почнемо авторизацію. Введіть номер вашого договору:");
                 userState.put(chatId, "WAITING_CONTRACT");
             } else if ("WAITING_CONTRACT".equals(userState.get(chatId))) {
@@ -52,7 +52,7 @@ public class DiagnosticBot extends TelegramLongPollingBot {
                     userState.put(chatId, "AUTHENTICATED");
                     sendMenu(chatId, "✅ Авторизація успішна! Оберіть дію:");
                 } else {
-                    sendText(chatId, "❌ Дані не збігаються. Спробуйте ще раз /start"));
+                    sendText(chatId, "❌ Дані не збігаються. Спробуйте ще раз /start");
                     userState.remove(chatId);
                 }
             } else if("AUTHENTICATED".equals(userState.get(chatId))) {
