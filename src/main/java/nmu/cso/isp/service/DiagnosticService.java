@@ -2,7 +2,9 @@ package nmu.cso.isp.service;
 
 import nmu.cso.isp.model.Customer;
 import nmu.cso.isp.repository.CustomerRepository;
+import org.springframework.stereotype.Service;
 
+@Service
 public class DiagnosticService {
     private final CustomerRepository customerRepository;
 

@@ -16,4 +16,5 @@ public class Customer {
     private String switchIp;
     private Integer portNumber;
     private Double balance;
+    private String residence;
 }
